@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Mini Aladin Stock Analyzer</title>
+</head>
+<body>
+    <h1>Mini Aladin - Real-Time Stock Analyzer</h1>
+    <form method="post">
+        Ticker: <input type="text" name="ticker"><br>
+        Start Date: <input type="text" name="start"><br>
+        End Date: <input type="text" name="end"><br>
+        <input type="submit" value="Analyze">
+    </form>
+    {% if data %}
+        <h2>Result:</h2>
+        {{ data | safe }}
+    {% endif %}
+</body>
+</html>
