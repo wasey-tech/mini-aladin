@@ -1,5 +1,9 @@
-Flask
-pandas
-yfinance
-ta
+flask
 gunicorn
+yfinance
+pandas
+numpy
+scikit-learn
+tensorflow
+matplotlib
+ta

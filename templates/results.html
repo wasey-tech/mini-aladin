@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Advanced Prediction - {{ ticker }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@2.1.0"></script>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>Mini Aladin Pro</h1>
+            <div class="ticker-info">
+                <span class="ticker-name">{{ ticker }}</span>
+                <span class="exchange">NASDAQ</span>
+            </div>
+        </header>
+        
+        <div class="price-summary">
+            <div class="price-card current">
+                <h2>Current Price</h2>
+                <p class="price">${{ current_price }}</p>
+            </div>
+            
+            <div class="price-card predicted">
+                <h2>Predicted Price</h2>
+                <p class="price">${{ predicted_price }}</p>
+                <p class="change {{ 'positive' if predicted_price > current_price else 'negative' }}">
+                    {{ ((predicted_price - current_price)/current_price*100)|round(2) }}%
+                </p>
+            </div>
+        </div>
+        
+        <div class="signal-section">
+            <h2>Trading Signal</h2>
+            <div class="signal-card {{ signal|lower }}">
+                <p class="signal-text">{{ signal }}</p>
+                <div class="confidence">
+                    <span>Confidence:</span>
+                    <div class="confidence-bar">
+                        <div class="confidence-level" style="width: {{ confidence }}%;"></div>
+                    </div>
+                    <span>{{ confidence }}%</span>
+                </div>
+            </div>
+            
+            <div class="signal-explanation">
+                <h3>Why {{ signal }}?</h3>
+                <ul>
+                    {% for reason in signal_reasons %}
+                    <li>{{ reason }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+        
+        <div class="trading-recommendations">
+            <h2>Trading Recommendations</h2>
+            <div class="recommendation-grid">
+                <div class="rec-card entry">
+                    <h3>Optimal Entry</h3>
+                    <p class="price">${{ entry_point }}</p>
+                    <p class="note">1% below current price</p>
+                </div>
+                
+                <div class="rec-card stop-loss">
+                    <h3>Stop Loss</h3>
+                    <p class="price">${{ stop_loss }}</p>
+                    <p class="note">5% risk threshold</p>
+                </div>
+                
+                <div class="rec-card take-profit">
+                    <h3>Take Profit</h3>
+                    <p class="price">${{ predicted_price }}</p>
+                    <p class="note">Predicted target</p>
+                </div>
+                
+                <div class="rec-card risk-reward">
+                    <h3>Risk/Reward</h3>
+                    <p class="ratio">1:{{ risk_reward_ratio }}</p>
+                    <p class="note">Favorable ratio</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="position-calculator">
+            <h2>Position Size Calculator</h2>
+            <div class="calculator-form">
+                <div class="form-group">
+                    <label for="account-size">Account Size ($):</label>
+                    <input type="number" id="account-size" value="10000">
+                </div>
+                <div class="form-group">
+                    <label for="risk-percent">Risk per Trade (%):</label>
+                    <input type="number" id="risk-percent" value="1" min="0.1" max="5" step="0.5">
+                </div>
+                <button id="calculate-btn">Calculate Position</button>
+                <div class="calculation-result">
+                    <p>Position Size: <span id="position-size">0</span> shares</p>
+                    <p>Risk Amount: $<span id="risk-amount">0</span></p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="chart-container">
+            <canvas id="priceChart"></canvas>
+        </div>
+        
+        <div class="technical-section">
+            <h2>Technical Indicators</h2>
+            <div class="indicators-grid">
+                <div class="indicator-card">
+                    <h3>Moving Averages</h3>
+                    <p>20-Day: ${{ indicators.MA20|round(2) }}</p>
+                    <p>50-Day: ${{ indicators.MA50|round(2) }}</p>
+                    <p class="signal {{ 'bullish' if indicators.MA20 > indicators.MA50 else 'bearish' }}">
+                        {{ 'Bullish' if indicators.MA20 > indicators.MA50 else 'Bearish' }} Crossover
+                    </p>
+                </div>
+                
+                <div class="indicator-card">
+                    <h3>RSI (14-Day)</h3>
+                    <p>{{ indicators.RSI|round(2) }}</p>
+                    <p class="signal {{ 'oversold' if indicators.RSI < 30 else 'overbought' if indicators.RSI > 70 else 'neutral' }}">
+                        {{ 'Oversold' if indicators.RSI < 30 else 'Overbought' if indicators.RSI > 70 else 'Neutral' }}
+                    </p>
+                </div>
+                
+                <div class="indicator-card">
+                    <h3>MACD</h3>
+                    <p>MACD: {{ indicators.MACD|round(4) }}</p>
+                    <p>Signal: {{ indicators.MACD_Signal|round(4) }}</p>
+                    <p class="signal {{ 'bullish' if indicators.MACD > indicators.MACD_Signal else 'bearish' }}">
+                        {{ 'Bullish' if indicators.MACD > indicators.MACD_Signal else 'Bearish' }} Momentum
+                    </p>
+                </div>
+                
+                <div class="indicator-card">
+                    <h3>Bollinger Bands</h3>
+                    <p>Upper: ${{ indicators.BB_Upper|round(2) }}</p>
+                    <p>Lower: ${{ indicators.BB_Lower|round(2) }}</p>
+                    <p class="signal {{ 'oversold' if current_price < indicators.BB_Lower else 'overbought' if current_price > indicators.BB_Upper else 'neutral' }}">
+                        {{ 'Oversold' if current_price < indicators.BB_Lower else 'Overbought' if current_price > indicators.BB_Upper else 'Neutral' }}
+                    </p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="model-performance">
+            <h2>Model Performance</h2>
+            <div class="performance-metrics">
+                <div class="metric-card">
+                    <h3>Accuracy</h3>
+                    <p class="value">{{ accuracy }}%</p>
+                    <p class="description">Historical prediction accuracy</p>
+                </div>
+                
+                <div class="metric-card">
+                    <h3>Win Rate</h3>
+                    <p class="value">{{ win_rate }}%</p>
+                    <p class="description">Profitable signals</p>
+                </div>
+                
+                <div class="metric-card">
+                    <h3>Risk/Reward</h3>
+                    <p class="value">1:{{ model_rr }}</p>
+                    <p class="description">Average ratio</p>
+                </div>
+            </div>
+        </div>
+        
+        <footer class="disclaimer">
+            <p>This analysis is for educational purposes only. Past performance is not indicative of future results. Trading stocks involves substantial risk of loss.</p>
+        </footer>
+    </div>
+    
+    <script>
+        // Chart data
+        const chartData = {{ chart_data|tojson }};
+        const entryPoint = {{ entry_point }};
+        const stopLoss = {{ stop_loss }};
+        const takeProfit = {{ predicted_price }};
+        
+        // Create price chart
+        const ctx = document.getElementById('priceChart').getContext('2d');
+        const priceChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: Array.from({ length: chartData.Close.length }, (_, i) => ''),
+                datasets: [
+                    {
+                        label: 'Price',
+                        data: chartData.Close,
+                        borderColor: '#3498db',
+                        backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                        fill: true,
+                        tension: 0.1
+                    },
+                    {
+                        label: '20-Day MA',
+                        data: chartData.MA20,
+                        borderColor: '#e74c3c',
+                        borderWidth: 1,
+                        borderDash: [5, 5],
+                        pointRadius: 0
+                    },
+                    {
+                        label: '50-Day MA',
+                        data: chartData.MA50,
+                        borderColor: '#2ecc71',
+                        borderWidth: 1,
+                        borderDash: [5, 5],
+                        pointRadius: 0
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    annotation: {
+                        annotations: {
+                            entryLine: {
+                                type: 'line',
+                                mode: 'horizontal',
+                                scaleID: 'y',
+                                value: entryPoint,
+                                borderColor: '#f39c12',
+                                borderWidth: 2,
+                                label: {
+                                    content: 'Entry: $' + entryPoint.toFixed(2),
+                                    position: 'start',
+                                    backgroundColor: '#f39c12'
+                                }
+                            },
+                            stopLossLine: {
+                                type: 'line',
+                                mode: 'horizontal',
+                                scaleID: 'y',
+                                value: stopLoss,
+                                borderColor: '#e74c3c',
+                                borderWidth: 2,
+                                label: {
+                                    content: 'Stop Loss: $' + stopLoss.toFixed(2),
+                                    position: 'start',
+                                    backgroundColor: '#e74c3c'
+                                }
+                            },
+                            takeProfitLine: {
+                                type: 'line',
+                                mode: 'horizontal',
+                                scaleID: 'y',
+                                value: takeProfit,
+                                borderColor: '#2ecc71',
+                                borderWidth: 2,
+                                label: {
+                                    content: 'Target: $' + takeProfit.toFixed(2),
+                                    position: 'start',
+                                    backgroundColor: '#2ecc71'
+                                }
+                            }
+                        }
+                    },
+                    legend: {
+                        position: 'top',
+                    },
+                    title: {
+                        display: true,
+                        text: 'Price Analysis with Trading Levels',
+                        font: {
+                            size: 16
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: false,
+                        grid: {
+                            color: 'rgba(0, 0, 0, 0.05)'
+                        }
+                    },
+                    x: {
+                        grid: {
+                            display: false
+                        }
+                    }
+                }
+            }
+        });
+        
+        // Position size calculator
+        document.getElementById('calculate-btn').addEventListener('click', function() {
+            const accountSize = parseFloat(document.getElementById('account-size').value);
+            const riskPercent = parseFloat(document.getElementById('risk-percent').value);
+            
+            if (isNaN(accountSize) || isNaN(riskPercent)) {
+                alert('Please enter valid numbers');
+                return;
+            }
+            
+            const entryPrice = {{ entry_point }};
+            const stopPrice = {{ stop_loss }};
+            const riskPerShare = entryPrice - stopPrice;
+            
+            if (riskPerShare <= 0) {
+                alert('Invalid entry/stop levels');
+                return;
+            }
+            
+            const riskAmount = accountSize * (riskPercent / 100);
+            const positionSize = Math.floor(riskAmount / riskPerShare);
+            
+            document.getElementById('position-size').textContent = positionSize;
+            document.getElementById('risk-amount').textContent = riskAmount.toFixed(2);
+        });
+        
+        // Trigger calculation on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('calculate-btn').click();
+        });
+    </script>
+</body>
+</html>

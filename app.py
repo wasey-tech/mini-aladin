@@ -1,36 +1,20 @@
 from flask import Flask, render_template, request
-from datetime import datetime
-from stock_data_fetcher import fetch_stock_data
+from prediction_system import predict_stock
+import os
 
 app = Flask(__name__)
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
-    error = None
-    result_table = None
-
     if request.method == 'POST':
-        ticker = request.form.get('ticker', '').strip().upper()
-        start_date = request.form.get('start_date', '')
-        end_date = request.form.get('end_date', '')
-
+        ticker = request.form['ticker']
         try:
-            if not ticker or not start_date or not end_date:
-                raise ValueError("All fields are required.")
-
-            start_dt = datetime.strptime(start_date, "%Y-%m-%d")
-            end_dt = datetime.strptime(end_date, "%Y-%m-%d")
-
-            if start_dt >= end_dt:
-                raise ValueError("Start date must be before end date.")
-
-            df = fetch_stock_data(ticker, start_date, end_date)
-            result_table = df.to_html(classes='table table-bordered table-striped table-sm', justify='center')
-
+            result = predict_stock(ticker)
+            return render_template('results.html', **result)
         except Exception as e:
-            error = str(e)
-
-    return render_template('index.html', error=error, table=result_table, max_date=datetime.today().strftime('%Y-%m-%d'))
+            return render_template('index.html', error=str(e))
+    return render_template('index.html')
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)
