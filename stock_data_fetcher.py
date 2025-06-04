@@ -1,29 +1,19 @@
 import yfinance as yf
-import pandas as pd
 import ta
+import pandas as pd
 
-def fetch_data(ticker, start_date, end_date):
-    data = yf.download(ticker, start=start_date, end=end_date)
-    if data.empty:
-        print("❌ No data found.")
-        return None
-    return data
+def fetch_stock_data(ticker, start_date, end_date):
+    ticker = ticker.strip().upper()
+    df = yf.download(ticker, start=start_date, end=end_date)
 
-def add_indicators(data):
-    data = data.copy()
-    data['rsi'] = ta.momentum.RSIIndicator(close=data['Close']).rsi()
-    data['macd'] = ta.trend.MACD(close=data['Close']).macd()
-    return data
+    if df.empty:
+        raise ValueError("No data found for your query. Please check the ticker symbol and date range.")
 
-def main():
-    ticker = input("Enter the stock ticker symbol (e.g., TSLA, AMZN, RELIANCE.NS, ^NSEI): ")
-    start = input("Enter the start date (YYYY-MM-DD): ")
-    end = input("Enter the end date (YYYY-MM-DD): ")
+    close_series = df['Close'].astype(float)
 
-    data = fetch_data(ticker, start, end)
-    if data is not None:
-        data = add_indicators(data)
-        print(data.tail())
+    df['RSI'] = ta.momentum.RSIIndicator(close=close_series).rsi()
+    macd = ta.trend.MACD(close=close_series)
+    df['MACD'] = macd.macd()
+    df['Signal Line'] = macd.macd_signal()
 
-if __name__ == "__main__":
-    main()
+    return df[['Close', 'RSI', 'MACD', 'Signal Line']].dropna()

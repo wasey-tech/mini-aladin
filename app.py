@@ -1,32 +1,36 @@
-import yfinance as yf
-import pandas as pd
-import ta
-from flask import Flask, request, render_template
+from flask import Flask, render_template, request
+from datetime import datetime
+from stock_data_fetcher import fetch_stock_data
 
 app = Flask(__name__)
 
-def fetch_data(ticker, start_date, end_date):
-    data = yf.download(ticker, start=start_date, end=end_date)
-    if data.empty:
-        return None
-    
-    # Fix: squeeze to 1D array for RSI and MACD
-    close_prices = data['Close'].squeeze()
-
-    data['rsi'] = ta.momentum.RSIIndicator(close=close_prices).rsi()
-    data['macd'] = ta.trend.MACD(close=close_prices).macd()
-    
-    return data.tail(10).to_html()
-
 @app.route('/', methods=['GET', 'POST'])
 def index():
-    data = None
+    error = None
+    result_table = None
+
     if request.method == 'POST':
-        ticker = request.form['ticker']
-        start = request.form['start']
-        end = request.form['end']
-        data = fetch_data(ticker, start, end)
-    return render_template('index.html', data=data)
+        ticker = request.form.get('ticker', '').strip().upper()
+        start_date = request.form.get('start_date', '')
+        end_date = request.form.get('end_date', '')
+
+        try:
+            if not ticker or not start_date or not end_date:
+                raise ValueError("All fields are required.")
+
+            start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+            end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+
+            if start_dt >= end_dt:
+                raise ValueError("Start date must be before end date.")
+
+            df = fetch_stock_data(ticker, start_date, end_date)
+            result_table = df.to_html(classes='table table-bordered table-striped table-sm', justify='center')
+
+        except Exception as e:
+            error = str(e)
+
+    return render_template('index.html', error=error, table=result_table, max_date=datetime.today().strftime('%Y-%m-%d'))
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=10000)
+    app.run(debug=True)
