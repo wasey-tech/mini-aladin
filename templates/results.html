@@ -46,7 +46,7 @@
     </div>
     
     <script>
-        const chartData = {{ chart_data|tojson }};
+        const chartData = { chart_data, tojson };
         const ctx = document.getElementById('priceChart').getContext('2d');
         
         new Chart(ctx, {
