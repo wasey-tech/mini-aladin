@@ -1,45 +1,50 @@
-# Add these new calculations to your predict_stock function
+import numpy as np
+import tensorflow as tf
+import pandas as pd
+from config import MODEL_PATH
+from data_fetcher import fetch_stock_data
+from data_processor import clean_data
+from technical_indicators import add_technical_indicators
+from trading_strategies import moving_average_signal, rsi_signal, bollinger_bands_signal
+from model_trainer import train_model, prepare_lstm_data
 
 def predict_stock(ticker):
-    # ... existing code ...
+    """Main prediction pipeline"""
+    # Fetch and process data
+    df = fetch_stock_data(ticker)
+    df = clean_data(df)
+    df = add_technical_indicators(df)
     
-    # Calculate additional metrics
-    risk_reward_ratio = round((predicted_price - entry_point) / (entry_point - stop_loss), 1)
-    confidence = min(95, max(70, int(85 + (5 if current_signal > 0 else -5))))  # Simulated confidence
+    # Train model (in real app, you'd load pre-trained)
+    model, scaler, _ = train_model(df)
     
-    # Generate signal reasons
-    signal_reasons = []
-    if df.iloc[-1]['MA20'] > df.iloc[-1]['MA50']:
-        signal_reasons.append("Bullish Moving Average Crossover (20MA > 50MA)")
-    if df.iloc[-1]['RSI'] < 35:
-        signal_reasons.append("RSI indicates oversold condition")
-    if df.iloc[-1]['Close'] < df.iloc[-1]['BB_Lower']:
-        signal_reasons.append("Price below Bollinger Band lower limit")
-    if current_signal < 0:
-        signal_reasons = [
-            "Bearish Moving Average Crossover (20MA < 50MA)",
-            "RSI indicates overbought condition",
-            "Price above Bollinger Band upper limit"
-        ]
+    # Prepare prediction data
+    seq_length = 60
+    scaled_data = scaler.transform(df['Close'].values.reshape(-1, 1))
+    X_pred = scaled_data[-seq_length:]
+    X_pred = np.reshape(X_pred, (1, seq_length, 1))
+    
+    # Make prediction
+    predicted_price = scaler.inverse_transform(model.predict(X_pred))[0][0]
+    last_price = df['Close'].iloc[-1]
+    
+    # Calculate entry and stop loss
+    entry_point = last_price * 0.99  # 1% below current
+    stop_loss = last_price * 0.95   # 5% stop loss
+    
+    # Apply trading strategies
+    df = moving_average_signal(df)
+    df = rsi_signal(df)
+    df = bollinger_bands_signal(df)
+    
+    # Combine signals
+    df['Final_Signal'] = df['Signal'] + df['RSI_Signal'] + df['BB_Signal']
+    
+    # Current signal
+    current_signal = df['Final_Signal'].iloc[-1]
     
     # Create chart data
     chart_data = df[['Close', 'MA20', 'MA50']].tail(100).reset_index(drop=True)
-    
-    # Get latest indicators
-    indicators = {
-        'MA20': df['MA20'].iloc[-1],
-        'MA50': df['MA50'].iloc[-1],
-        'RSI': df['RSI'].iloc[-1],
-        'MACD': df['MACD'].iloc[-1],
-        'MACD_Signal': df['MACD_Signal'].iloc[-1],
-        'BB_Upper': df['BB_Upper'].iloc[-1],
-        'BB_Lower': df['BB_Lower'].iloc[-1]
-    }
-    
-    # Simulate model performance metrics
-    accuracy = 78.5
-    win_rate = 82.3
-    model_rr = 2.8
     
     return {
         'ticker': ticker,
@@ -48,16 +53,9 @@ def predict_stock(ticker):
         'entry_point': round(entry_point, 2),
         'stop_loss': round(stop_loss, 2),
         'signal': "BUY" if current_signal > 0 else "SELL" if current_signal < 0 else "HOLD",
-        'confidence': confidence,
-        'signal_reasons': signal_reasons,
-        'risk_reward_ratio': risk_reward_ratio,
         'chart_data': {
             'Close': chart_data['Close'].tolist(),
             'MA20': chart_data['MA20'].tolist(),
             'MA50': chart_data['MA50'].tolist()
-        },
-        'indicators': indicators,
-        'accuracy': accuracy,
-        'win_rate': win_rate,
-        'model_rr': model_rr
+        }
     }
